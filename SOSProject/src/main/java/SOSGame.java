@@ -6,6 +6,8 @@ import java.awt.event.ActionListener;
 public class SOSGame extends JFrame {
     private GameLogic gameLogic;
     private JButton startButton;
+    private JPanel overlayPanel;
+    private JComboBox<String> opponentTypeComboBox;
 
     public SOSGame() {
         setTitle("SOS Game");
@@ -21,13 +23,18 @@ public class SOSGame extends JFrame {
         JComboBox<String> boardSizeComboBox = new JComboBox<>(new String[]{"3x3", "4x4", "5x5"});
         JLabel gameModeLabel = new JLabel("Game Mode:");
         JComboBox<String> gameModeComboBox = new JComboBox<>(new String[]{"Simple", "General"});
+        JLabel opponentTypeLabel = new JLabel("Opponent:");
+        opponentTypeComboBox = new JComboBox<>(new String[]{"Player", "Computer"});
+
         startButton = new JButton("Start Game");
         startButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String selectedBoardSize = (String) boardSizeComboBox.getSelectedItem();
                 String selectedGameMode = (String) gameModeComboBox.getSelectedItem();
-                gameLogic.initializeGame(selectedBoardSize, selectedGameMode);
+                System.out.println("Selected Game Mode: " + selectedGameMode);
+                String opponentType = (String) opponentTypeComboBox.getSelectedItem();
+                gameLogic.initializeGame(selectedBoardSize, selectedGameMode, opponentType);
                 updateGameBoardUI();
             }
         });
@@ -36,44 +43,42 @@ public class SOSGame extends JFrame {
         optionsPanel.add(boardSizeComboBox);
         optionsPanel.add(gameModeLabel);
         optionsPanel.add(gameModeComboBox);
+        optionsPanel.add(opponentTypeLabel);
+        optionsPanel.add(opponentTypeComboBox);
         optionsPanel.add(startButton);
 
         add(optionsPanel, BorderLayout.NORTH);
-
-    }
-
-    //FOR UNIT TESTING
-    public GameLogic getGameLogic() {
-        return gameLogic;
-    }
-
-    public JButton getStartButton() {
-        return startButton;
+        overlayPanel = new JPanel();
+        overlayPanel.setOpaque(false);
+        add(overlayPanel, BorderLayout.CENTER);
     }
 
     private void updateGameBoardUI() {
-        // Remove existing UI
         getContentPane().removeAll();
-
-        // For displaying game board
         JPanel boardPanel = new JPanel(new GridLayout(gameLogic.getBoard().length, gameLogic.getBoard().length));
+        boardPanel.setPreferredSize(new Dimension(500, 500));
+
         char[][] board = gameLogic.getBoard();
         for (int i = 0; i < board.length; i++) {
             for (int j = 0; j < board[i].length; j++) {
-                JButton cellButton = new JButton(Character.toString(board[i][j]));
+                JButton cellButton = new JButton(board[i][j] == ' ' ? " " : Character.toString(board[i][j]));
+                cellButton.setFont(new Font("Arial", Font.BOLD, 24));
                 cellButton.setPreferredSize(new Dimension(50, 50));
-                // Add action listener to handle cell clicks
                 int row = i;
                 int col = j;
                 cellButton.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        // Check if it's the player's turn
-                        if ((gameLogic.isSTurn() && board[row][col] == ' ') || (gameLogic.isOTurn() && board[row][col] == ' ')) {
-                            // Make a move
-                            gameLogic.makeMove(row, col);
-                            // Update UI
-                            updateGameBoardUI();
+                        if (gameLogic.makePlayerMove(row, col)) {
+                            cellButton.setText(Character.toString(gameLogic.getBoard()[row][col]));
+                            if (gameLogic.isGameOver()) {
+                                displayGameOver();
+                            } else if ("Computer".equals(gameLogic.getOpponentType()) && !gameLogic.isSTurn()) {
+                                SwingUtilities.invokeLater(() -> {
+                                    gameLogic.makeComputerMove();
+                                    updateGameBoardUI();
+                                });
+                            }
                         } else {
                             JOptionPane.showMessageDialog(null, "Invalid move: Cell already occupied");
                         }
@@ -83,16 +88,23 @@ public class SOSGame extends JFrame {
             }
         }
 
-        // Add the board panel to the content pane
-        getContentPane().add(boardPanel, BorderLayout.CENTER);
-
-        // Add labels to indicate whose turn it is
+        add(boardPanel, BorderLayout.CENTER);
         JLabel turnLabel = new JLabel("It's " + (gameLogic.isSTurn() ? "S" : "O") + "'s turn");
-        getContentPane().add(turnLabel, BorderLayout.SOUTH);
+        add(turnLabel, BorderLayout.SOUTH);
 
-        // Repaint the frame to reflect the changes
         revalidate();
         repaint();
+    }
+
+    private void displayGameOver() {
+        String message = "Game Over! ";
+        if ("Simple".equals(gameLogic.getGameMode())) {
+            message += "The first SOS was made. ";
+        }
+        message += gameLogic.getSScore() > gameLogic.getOScore() ? "S wins!" : gameLogic.getSScore() < gameLogic.getOScore() ? "O wins!" : "It's a draw!";
+        JOptionPane.showMessageDialog(this, message);
+        gameLogic.resetGame();
+        updateGameBoardUI();
     }
 
     public static void main(String[] args) {
@@ -101,7 +113,4 @@ public class SOSGame extends JFrame {
             sosGame.setVisible(true);
         });
     }
-
 }
-
-

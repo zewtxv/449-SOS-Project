@@ -24,7 +24,7 @@ public class SOSGame extends JFrame {
         JLabel gameModeLabel = new JLabel("Game Mode:");
         JComboBox<String> gameModeComboBox = new JComboBox<>(new String[]{"Simple", "General"});
         JLabel opponentTypeLabel = new JLabel("Opponent:");
-        opponentTypeComboBox = new JComboBox<>(new String[]{"Player", "Computer"});
+        opponentTypeComboBox = new JComboBox<>(new String[]{"Player", "Computer", "Computer vs. Computer"});
 
         startButton = new JButton("Start Game");
         startButton.addActionListener(new ActionListener() {
@@ -35,7 +35,11 @@ public class SOSGame extends JFrame {
                 System.out.println("Selected Game Mode: " + selectedGameMode);
                 String opponentType = (String) opponentTypeComboBox.getSelectedItem();
                 gameLogic.initializeGame(selectedBoardSize, selectedGameMode, opponentType);
-                updateGameBoardUI();
+                if ("Computer vs. Computer".equals(opponentType)) {
+                    new Thread(SOSGame.this::autoplayGame).start();
+                } else {
+                    updateGameBoard();
+                }
             }
         });
 
@@ -53,7 +57,7 @@ public class SOSGame extends JFrame {
         add(overlayPanel, BorderLayout.CENTER);
     }
 
-    private void updateGameBoardUI() {
+    private void updateGameBoard() {
         getContentPane().removeAll();
         JPanel boardPanel = new JPanel(new GridLayout(gameLogic.getBoard().length, gameLogic.getBoard().length));
         boardPanel.setPreferredSize(new Dimension(500, 500));
@@ -66,22 +70,19 @@ public class SOSGame extends JFrame {
                 cellButton.setPreferredSize(new Dimension(50, 50));
                 int row = i;
                 int col = j;
-                cellButton.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        if (gameLogic.makePlayerMove(row, col)) {
-                            cellButton.setText(Character.toString(gameLogic.getBoard()[row][col]));
-                            if (gameLogic.isGameOver()) {
-                                displayGameOver();
-                            } else if ("Computer".equals(gameLogic.getOpponentType()) && !gameLogic.isSTurn()) {
-                                SwingUtilities.invokeLater(() -> {
-                                    gameLogic.makeComputerMove();
-                                    updateGameBoardUI();
-                                });
-                            }
-                        } else {
-                            JOptionPane.showMessageDialog(null, "Invalid move: Cell already occupied");
+                cellButton.addActionListener(e -> {
+                    if (gameLogic.makePlayerMove(row, col)) {
+                        cellButton.setText(Character.toString(gameLogic.getBoard()[row][col]));
+                        if (gameLogic.isGameOver()) {
+                            displayGameOver();
+                        } else if ("Computer".equals(gameLogic.getOpponentType()) && !gameLogic.isSTurn()) {
+                            SwingUtilities.invokeLater(() -> {
+                                gameLogic.makeComputerMove();
+                                updateGameBoard();
+                            });
                         }
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Invalid move: Cell already occupied");
                     }
                 });
                 boardPanel.add(cellButton);
@@ -104,7 +105,7 @@ public class SOSGame extends JFrame {
         message += gameLogic.getSScore() > gameLogic.getOScore() ? "S wins!" : gameLogic.getSScore() < gameLogic.getOScore() ? "O wins!" : "It's a draw!";
         JOptionPane.showMessageDialog(this, message);
         gameLogic.resetGame();
-        updateGameBoardUI();
+        updateGameBoard();
     }
 
     public static void main(String[] args) {
@@ -113,4 +114,22 @@ public class SOSGame extends JFrame {
             sosGame.setVisible(true);
         });
     }
+    private void autoplayGame() {
+        while (!gameLogic.isGameOver()) {
+            gameLogic.makeComputerMove();
+            try {
+                Thread.sleep(500); //simulate time between moves
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            // Update the game board on the EDT
+            SwingUtilities.invokeLater(this::updateGameBoard);
+        }
+        // Display game over message on the EDT
+        SwingUtilities.invokeLater(this::displayGameOver);
+    }
+
+
+
 }

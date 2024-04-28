@@ -13,6 +13,11 @@ public class GameLogic {
     private boolean gameOver = false;
     private List<List<Point>> sosCombinations = new ArrayList<>();
     private Random random = new Random();
+    private GameLogger logger;
+
+    public GameLogic(GameLogger logger) {
+        this.logger = logger;
+    }
 
     public void initializeGame(String boardSize, String gameMode, String opponentType) {
         int size = Integer.parseInt(boardSize.split("x")[0]);
@@ -34,6 +39,9 @@ public class GameLogic {
             return false;
         }
         makeMove(row, col);
+        if (logger != null) {
+            logger.logAction("Player move at (" + row + ", " + col + ")");
+        }
         return true;
     }
 
@@ -50,6 +58,9 @@ public class GameLogic {
         if (!emptyCells.isEmpty()) {
             Point move = emptyCells.get(random.nextInt(emptyCells.size()));
             makeMove(move.x, move.y);
+            if (logger != null) {
+                logger.logAction("Computer move at (" + move.x + ", " + move.y + ")");
+            }
         }
     }
 
@@ -134,5 +145,4 @@ public class GameLogic {
     public String getOpponentType() {
         return opponentType;
     }
-
 }

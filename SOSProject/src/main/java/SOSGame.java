@@ -2,12 +2,18 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.FileWriter;
+import java.io.IOException;
 
-public class SOSGame extends JFrame {
+public class SOSGame extends JFrame implements GameLogger {
     private GameLogic gameLogic;
     private JButton startButton;
+    private JButton replayButton;
     private JPanel overlayPanel;
     private JComboBox<String> opponentTypeComboBox;
+    private FileWriter logWriter;
 
     public SOSGame() {
         setTitle("SOS Game");
@@ -16,7 +22,13 @@ public class SOSGame extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        gameLogic = new GameLogic();
+        try {
+            logWriter = new FileWriter("game_log.txt", true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        gameLogic = new GameLogic(this);
 
         JPanel optionsPanel = new JPanel();
         JLabel boardSizeLabel = new JLabel("Board Size:");
@@ -32,7 +44,6 @@ public class SOSGame extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 String selectedBoardSize = (String) boardSizeComboBox.getSelectedItem();
                 String selectedGameMode = (String) gameModeComboBox.getSelectedItem();
-                System.out.println("Selected Game Mode: " + selectedGameMode);
                 String opponentType = (String) opponentTypeComboBox.getSelectedItem();
                 gameLogic.initializeGame(selectedBoardSize, selectedGameMode, opponentType);
                 if ("Computer vs. Computer".equals(opponentType)) {
@@ -41,6 +52,12 @@ public class SOSGame extends JFrame {
                     updateGameBoard();
                 }
             }
+        });
+
+        replayButton = new JButton("Replay Game");
+        replayButton.addActionListener(e -> {
+            gameLogic.resetGame();
+            updateGameBoard();
         });
 
         optionsPanel.add(boardSizeLabel);
@@ -55,6 +72,25 @@ public class SOSGame extends JFrame {
         overlayPanel = new JPanel();
         overlayPanel.setOpaque(false);
         add(overlayPanel, BorderLayout.CENTER);
+
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                try {
+                    logWriter.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public void logAction(String action) {
+        try {
+            logWriter.write(action + System.lineSeparator());
+            logWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void updateGameBoard() {
@@ -103,10 +139,19 @@ public class SOSGame extends JFrame {
             message += "The first SOS was made. ";
         }
         message += gameLogic.getSScore() > gameLogic.getOScore() ? "S wins!" : gameLogic.getSScore() < gameLogic.getOScore() ? "O wins!" : "It's a draw!";
-        JOptionPane.showMessageDialog(this, message);
-        gameLogic.resetGame();
-        updateGameBoard();
+
+        // Custom dialog with a replay option
+        Object[] options = {"Replay"};
+        int choice = JOptionPane.showOptionDialog(this, message, "Game Over",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE,
+                null, options, options[0]);
+
+        if (choice == 0) {
+            gameLogic.resetGame();
+            updateGameBoard();
+        }
     }
+
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -114,22 +159,22 @@ public class SOSGame extends JFrame {
             sosGame.setVisible(true);
         });
     }
+
     private void autoplayGame() {
         while (!gameLogic.isGameOver()) {
             gameLogic.makeComputerMove();
             try {
-                Thread.sleep(500); //simulate time between moves
+                Thread.sleep(500);
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
                 return;
             }
-            // Update the game board on the EDT
             SwingUtilities.invokeLater(this::updateGameBoard);
         }
-        // Display game over message on the EDT
         SwingUtilities.invokeLater(this::displayGameOver);
     }
+}
 
-
-
+interface GameLogger {
+    void logAction(String action);
 }
